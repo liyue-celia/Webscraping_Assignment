@@ -1,0 +1,137 @@
+---
+title: "MNB by Months"
+author: "YaoYu & LiYue"
+date: "12/3/2019"
+output: html_document
+---
+
+
+
+0.library
+```{r}
+library(rvest)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(httr)
+library(data.table)
+library(ggplot2)
+```
+
+
+1.Set a function to get one month data
+```{r}
+#t <- read_html('https://www.mnb.hu/en/arfolyam-tablazat?deviza=rbCurrencyActual&devizaSelected=HUF&datefrom=01%2F02%2F2019&datetill=01%2F03%2F2019&order=1')
+#write_html(t,'t.html')
+get_one_month <- function(mydate) {
+  mydate2<-as.character(as.Date(mydate, format='%d/%m/%Y') +months(1), format='%d/%m/%Y')
+ require(httr)
+ params = list(
+  `deviza` = 'rbCurrencyActual',
+  `devizaSelected` = 'HUF',
+  `datefrom` = mydate,
+  `datetill` = mydate2,
+  `order` = '1'
+ )
+
+ res <- httr::GET(url = 'https://www.mnb.hu/en/arfolyam-tablazat', query = params)
+
+ t <- read_html(content(res, 'text'))
+ write_html(t,'t.html')
+ 
+ list_table <- 
+   t %>% 
+   html_table()
+ 
+ my_df <- list_table[[1]]
+ 
+ 
+ t <- my_df[c(1,2),]
+ names(t)[1] <- 'my_date'
+ t$my_date <- NULL
+ 
+ base_df <- data.frame()
+ 
+ for (my_cols in 1:length(t)) {
+   print(my_cols)
+   base_df <- rbind(base_df, data.frame('short_name'= names(t)[my_cols], 'long_name'= t[1,my_cols], unit=t[2,my_cols] ))
+ }
+ 
+ t_basedf <- base_df
+ 
+ 
+ my_all_df <- NULL
+ for (my_row in c(3:nrow(my_df))) {
+   base_df <- t_basedf
+   print(my_row)
+   
+   base_df$values <- as.character(my_df[my_row,][2:length(my_df[my_row,])])
+   base_df$date <- as.character(my_df[my_row,][1])
+   my_all_df <- rbind(my_all_df, base_df)
+ }
+ 
+ return(my_all_df)
+}
+```
+
+2.set a date list, in this case we choese 2 years
+  whcih form 2017-01-01 to 2019-01-01
+```{r}
+# set date list
+date1<-seq(as.Date("2017/01/01"), as.Date("2019/01/01"), "months",format='%d/%m/%Y')
+
+# Make the time list the format we need
+myDate<-as.character(date1,format='%d/%m/%Y')
+myDate
+```
+
+3.For each date in the list, request function
+```{r,message=FALSE,warning=FALSE,eval=FALSE}
+mymnb_list<-lapply(myDate,get_one_month)
+mymnb_df <- rbindlist(mymnb_list)
+myMNB <- data.frame(mymnb_df)
+str(myMNB)
+```
+
+4.Adjust the data format in dataframe for data analysis and plot
+```{r,message=FALSE,warning=FALSE,eval=FALSE}
+myMNB$short_name<- as.character(myMNB$short_name)
+myMNB$long_name<- as.character(myMNB$long_name)
+myMNB$unit<-as.numeric(as.character(myMNB$unit))
+myMNB$values<-as.numeric(as.character(myMNB$values))
+myMNB$date<- as.Date(myMNB$date, format='%d %b %Y')
+```
+
+
+5.Store adjusted dataas csv and RDs
+```{r,message=FALSE,warning=FALSE,eval=FALSE}
+write.table(myMNB, 'MNB_by_Months.csv', sep = ",", dec = ".", col.names = TRUE)
+saveRDS(myMNB, file = "/Users/Celia/Desktop/webscraping/Assignment/MNB_by_Months.rds")
+```
+
+
+6.make some plots
+```{r,message=FALSE,warning=FALSE,eval=FALSE}
+p<-filter(myMNB,short_name %in% c('CNY','EUR','GBP','USD'))
+
+
+ggplot(p,mapping = aes(x=date,y=values,color=short_name))+
+  geom_line()+
+  labs(x = 'Date', y ='Rate', title = 'MNB_RATE')+
+  theme_bw()+
+  ggsave("plot1.pdf")
+
+
+ggplot(myMNB,mapping = aes(y= values,fill =values,color = short_name)) +
+   geom_boxplot()+
+   theme_bw()+
+   ggsave("plot2.pdf")
+
+
+ggplot() +
+   geom_point(myMNB,mapping = aes(x= date,y =values,color= short_name))+
+   labs(x = 'Date', y ='Rate', title = 'MNB_RATE')+
+   theme_bw()+
+   ggsave("plot3.pdf")
+```
+

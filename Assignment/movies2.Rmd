@@ -1,0 +1,57 @@
+---
+title: "Assignment2"
+author: "liyue"
+date: "12/4/2019"
+output: html_document
+---
+
+**Description**
+In this page of the same website, it is also a leaderboard but it is a waterfall flow page. This page can set and request action movies with 100% - 0% praise. Here, I set the request is 100% - 90% of the film praise. And expect to be able to crawl all of them. In addition to cycling, I learned a new method from the website and made some attempts.
+(use the plug-in JSON handle and rselenium to grab. Unfortunately, rselenium did not start successfully. So just share the magic JSON handle plug-in here.)
+
+*Let's take a look at this page:*
+The website is a typical waterfall flow website, with the browser scrolling down, the page information is constantly updated. There are two ways to try to grab:
+
+*The first method is:*
+For each drop-down page, AJAX asynchronous loading will request a new address. If these addresses change regularly, you can directly grab them by splicing the addresses.
+Get the JSON document requested by Ajax asynchronous loading. The steps to read the document from R are as follows:
+FN + F12 open the developer tool of Chrome browser, find the network column, implement a pull-down update, and observe the request changes in the column. Find the new request address as shown in the figure below: it is known that the request method is get, and the request content is a JSON document.
+Right click the request address and select open in new tab. If the JSON handle plug-in is installed, the web page will be presented in a fairly regular JSON file format. You can find that the content of the file is all the newly loaded movie information.
+Continue to pull down until all the information has been loaded, and then check all the request links in the XHR menu. It is found that the address changes regularly: the parameter start increases by 20 every time, and the parameter limit remains the same. Therefore, it is speculated that each pull-down will start from the previous position and continue to load 20 movies.
+So change the request address a little bit, make the starting position start = 0, and the number of single loading limit = 661 (there are 661 movies in total), we can get the JSON document address containing the complete movie information, or change any value we need.
+*The second method is:*
+Use the rselenium package to simulate the pull-down process of the browser scroll bar, pull it down to the bottom of the page, until all the information is loaded, and then grab the required content from this page. Unfortunately, I haven't started the rselenium sever successfully.
+
+For web pages loaded asynchronously, method one obtains JSON documents directly by observing the new address of each request, and then reads them into R. The advantage is that the information obtained is quite complete, and it does not need to spend too much time on data cleaning. The disadvantage is that when a complex website is encountered, the new request address has no regularity to follow, or multiple pages need to be crawled, and the request regularity of each page cannot be observed one by one. Method one is less automatic.
+
+
+**Workflow**
+```{r,message=FALSE, warning=FALSE}
+library(jsonlite)
+library(magrittr)
+
+url <- "https://movie.douban.com/j/chart/top_list?type=11&interval_id=100%3A90&action=&start=0&limit=661"
+
+destination  <- readLines(url, encoding = "UTF-8") %>% fromJSON()
+
+title        <- destination$title
+score        <- destination$score
+release_date <- destination$release_date
+movie_url    <- destination$url
+cover_url    <- destination$cover_url
+types        <- destination$types %>% paste0()
+regions      <- destination$regions %>% paste0()
+actors       <- destination$actors %>% paste0()
+is_playable  <- destination$is_playable
+is_watched   <- destination$is_watched
+
+
+movieinfo    <- data.frame(title, score, release_date, movie_url, 
+                           cover_url, types, regions, actors, 
+                           is_playable, is_watched)
+
+View(movieinfo)
+write.table(movieinfo, 'movies2.csv', sep = ",", dec = ".", col.names = TRUE)
+saveRDS(movieinfo, file = "/Users/Celia/Desktop/webscraping/Assignment/movies2.rds")
+```
+

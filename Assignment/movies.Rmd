@@ -1,0 +1,61 @@
+---
+title: "Assignment1"
+author: "liyue"
+date: "12/3/2019"
+output: html_document
+---
+
+**Description**
+I chose a Chinese movie evaluation website and wanted to crawl the top 250 movie information on this website (the purpose is to use this data table to compare with IMDB movie rankings later). So I grab the three parameters of movie name, ranking and rating. I'm very sorry that some of the content is in Chinese. I didn't think about it thoroughly. If it brings you difficulties, I would like to apologize to you here first.
+
+After completing this task, I am curious to apply these codes to another ranklist page of this website, but the magic is that that page is a waterfall page. In the process of exploration, I learned a new method, which I put in movies2.
+
+
+**Workflow**
+
+Importing the necessary libraries
+
+```{r,message=FALSE, warning=FALSE}
+library(rvest)
+library(httr)
+library(data.table)
+library(tidyverse)
+library(ggplot2)
+```
+
+Scraping the website
+
+```{r,message=FALSE, warning=FALSE}
+# function to get news from one page
+
+get_one_page_news <- function(my_url) {
+  DB_html <- read_html(my_url)
+  write_html(DB_html, 'DB_html.html')
+  
+  title <- DB_html%>% html_nodes('.title:nth-child(1)') %>% html_text()
+  Rank <- DB_html %>% html_nodes('em') %>% html_text()
+  score <- DB_html%>% html_nodes('.rating_num') %>% html_text()
+  
+  news_df <- data.frame('title' = title, 'Rank' = Rank, 'score' = score)
+  return(news_df)
+}
+
+# set my_pages as a url list Because there are 25 movies on each page.
+# the first page starts with 0, the second page starts with 25, and so on
+
+my_pages <- paste0('https://movie.douban.com/top250?start=',
+                   seq(from = 0, to = 225, by = 25),'&filter=')
+my_pages
+
+# For each URL in the list, request function
+movies_by_page <- lapply(my_pages, get_one_page_news)
+
+# Put together the data requested in the previous step
+all_movies <- rbindlist(movies_by_page)
+View(all_movies)
+
+# save
+write.table(all_movies, 'movies.csv', sep = ",", dec = ".", col.names = TRUE)
+saveRDS(all_movies, file = "/Users/Celia/Desktop/webscraping/Assignment/movies.rds")
+
+```
